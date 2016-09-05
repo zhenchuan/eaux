@@ -4,12 +4,12 @@ the advertisers always need real-time data feedback to optimize their delivery s
 
 firstly,We used `druid.io` a period of time in our test environment, we found some problems
 
-#### druid when dealing with very heavy data update
+#### hard to dealing with delayed update
 
 This is very common in advertising, such as two-jump / conversion data is often a long delay to click, when you update, you need to perform the entire Reindex, this takes a long time
 
 
-#### druid in multidimensional data processing in real-time ingest always result in poor result
+#### multidimensional data processing in real-time ingest always result in poor result
 
 Advertising logs often need to deal with 60 + dimensions, 20 + metrics data, those data will be aggregated by druid in memory, it can easily lead to GC, resulting message with ZK interruption, which causing a constant Reindex
 
@@ -17,10 +17,10 @@ Advertising logs often need to deal with 60 + dimensions, 20 + metrics data, tho
 sql for most analysts is a better choice
 
 ------
-the current popular frameworks (eg: kylin, pinot, druid).  
-the popular data warehouse design can actually be summed up with the following
+After investigating a series of the current popular frameworks (eg: kylin, pinot, druid).  
+we found that the popular data warehouse design can actually be summed up with the following
 
-> issue parallel operation of Efficient storage of data on a highly available distributed file system 
+> issue parallel operation to Efficient storage of data on a highly available distributed file system 
 
 things becomes very simple
 
@@ -32,11 +32,11 @@ things becomes very simple
 
 The problem is redefined 
 
-> issue parallel operation( by *presto*) on Efficient storage of data(by *ORC*) of a highly available distributed file system (by *hdfs*)
+> issue parallel operation( by *presto*) to Efficient storage of data(by *ORC*) of a highly available distributed file system (by *hdfs*)
 
-what we will to do becomes just generating ORC files on hdfs ~
+what we will to do becomes just generating ORC files to hdfs :-D
 
-Meanwhile, in order to query efficiency,  the aggregation granularity become hour
+Meanwhile, in order to query efficiency,  the aggregation granularity become hourly
 ```sql
 insert overwite my_orc_table partition (pday = 20151201, phour = 4) select a, b, sum (imp), sum (click) from my_orc_table where log_type = 'ic' and pday = 20151201 and phour = 4
 ```
@@ -44,14 +44,14 @@ insert overwite my_orc_table partition (pday = 20151201, phour = 4) select a, b,
 1. source (kafka) -> orc file -> hdfs
 2. crontab for aggregation
 
-Thus, eaux arises, https://github.com/zhenchuan/eaux
+Thus, [eaux](https://github.com/zhenchuan/eaux) arises, https://github.com/zhenchuan/eaux
 
 ------
 
-### aims
-eaux's role is read from the data source file and produces a file format ORC uploaded to the HDFS ~
+### Aims
+Eaux's role is read from the data source  and produces a file format ORC  then uploaded to the HDFS ~
 
-In practice, there are several problems to be solved
+Actually, there are several problems to be solved
 
 ##### when to generate the ORC files.
 `Eaux` generate` ORC` provided in the following configuration file 
@@ -66,15 +66,15 @@ In practice, there are several problems to be solved
 `Eaux` provides` GroupFileWriter` to provide custom logic.
 
 
-##### Since the `orc file wirter` provided by hive is procesed in the memory process, the need to ensure that data is persisted to disk before the program terminates and will not cause data loss
+##### Since the `orc file wirter` provided by hive is processed in the memory process, the need to ensure that data is persisted to disk when the program terminates and will not cause data loss
 
-`Eaux` using the` CommitLog` mechanism to ensure the safe of the data is written. If the document fails to generate ORC, will recover from CommitLog  ~
+`Eaux` using the` CommitLog` mechanism to ensure the safety of the data is written. If the document fails to generate ORC, it will still be recovered from CommitLog  ~
 
 -----
 
-### scalability
+### Scalability
 it 's easy to scale out ,
-just copy the generated bin codes to another machine,the run it
+just copy the generated bin codes to another machine,then run it
 
 ###  install to local maven repo
 ```
@@ -122,7 +122,7 @@ We just need to put  generated orc file to those paths
 ### code
 
 #### GroupedHdfsSink
-genertate data for `eaux_grouped` table
+generate data for `eaux_grouped` table
 ```java
 //sink configuration
 Configuration groupedConfiguration = new PropertiesConfiguration("report.properties");
@@ -144,7 +144,7 @@ HdfsSink groupedHdfsSink = new GroupedHdfsSink(groupedConfiguration,groupFileWri
 ```
 [`FileNameGenerator`](https://github.com/zhenchuan/eaux/blob/master/core/src/main/java/me/zhenchuan/eaux/upload/FileNameGenerator.java) interface is used for define the local path and hdfs path.  the grouping method is prefered to  put in its implementation class 
 
-If the use of `commitlog.enable=true` , the `Group FileWriter` will automatically recover data form commitlog , you do not have to pass additional parameters, so here's arguments are null, `groupFileWriter.recoverWith (null, null)`
+If setting the configuration of `commitlog.enable=true` , the `Group FileWriter` will automatically recover data form commitlog , you do not have to pass additional parameters, so here's arguments are null, `groupFileWriter.recoverWith (null, null)`
 
 
 
@@ -188,8 +188,7 @@ auto.offset.reset | largest
 consumer.timeout.ms | 60000
 socket.receive.buffer.bytes | 1048576
 fetch.message.max.bytes | 1048576
-consumerTopics | topic:thread_num,
-eg: imp:2,click:1
+consumerTopics | topic:thread_num,eg: imp:2,click:1
 
 #### hdfs sink 
 key | value

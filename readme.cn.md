@@ -1,3 +1,51 @@
+在广告投放中,广告主需要通过实时的投放数据来优化投放策略.
+
+我们在测试环境使用了`druid.io`一段时间, 发现一些问题
+
+#### druid在处理数据更新时很笨重
+这个在广告投放中很常见,比如二跳/转化的数据往往延迟于点击很长时间, 在更新时,需要整个进行Reindex ,这个需要很长时间.
+并且我们不可能对每一条二跳/转化日志的日志都进行Reindex.
+> 使用hive的分区,将曝光/点击数据保存在logtype='ic'的分区中,二跳/转化的数据保存在logtype='jc'中,这样聚合时只需要处理logtype='ic'中的,同时由于logtype='jc'的数据很小,往往不需要额外处理~
+
+#### druid在处理非常多维度的数据实时ingest时,结果很差
+广告日志中往往需要处理60+dimension,20+metric的数据,druid在内存中会进行group,很容易引发GC,造成同ZK的消息中断,导致不断的Reindex
+> 测试证明,对于实时的数据,我们不需要进行直接的聚合操作,已经可以通过presto的分布式查询来得到满意的结果, 这样聚合的粒度我们可以放宽到小时的级别
+
+#### druid不支持sql
+sql对于大多数数据分析师来说是更好的选择
+> presto 支持
+
+抛开目前的流行框架(eg:kylin,pinot,druid), 目前流行的各种数据仓库的设计其实都可以用下面的一句话来概括
+> 对高可用的文件系统上高效存储的数据进行分布式查询操作
+
+问题就变的的很简单了
+
+1. ORC,Parquet在列存储上已经是很好的实现,不需要再额外实现新的文件格式
+2. HDFS已经是被证明的高可用文件存储方案,不需要额外自己调度实现
+3. Presto是非常优秀的查询引擎,做了很多查询优化
+4. Hive Sql可以很方便的GroupBy来对数据进行聚合操作,`HadoopIndexer`完全没有必要 ; 同时hive sql非常灵活,可以在建立多个cube来加速查询
+5. 
+
+问题就变的非常简单
+> 对高可用的文件系统上(hdfs)高效存储的(orc)数据进行分布式查询(presto)操作
+
+实际需要做的事情就变成了: 生成ORC文件放到hdfs上~
+
+同时为了查询效率,每隔一段时间,从之前的数据进行聚合操作 
+```sql
+insert overwite my_orc_table partition(pday =20151201 , phour = 4) select a,b,sum(imp),sum(click) from my_orc_table where log_type='ic' and pday =20151201 and phour = 4
+```
+
+1. source(kafka) -> orc file -> hdfs
+2. crontab 
+
+
+于是,[eaux](https://github.com/zhenchuan/eaux)就产生了,
+https://github.com/zhenchuan/eaux
+
+
+---------
+
 
 目前流行的各种数据仓库的设计都可以用下面的一句话来概括
 > 对高可用的文件系统上高效存储的数据进行分布式查询操作
