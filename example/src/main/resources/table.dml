@@ -1,0 +1,39 @@
+CREATE  TABLE eaux(
+  day INT ,
+  hour INT ,
+  id_advertiser_id INT ,
+  action_platform STRING ,
+  bid_policy_data STRING ,
+  bid_rank_data STRING ,
+  imp BIGINT ,
+  click BIGINT
+) partitioned by (pDay int,pHour int,adv int) stored as orc ;
+
+
+alter table eaux add if not exists partition(pDay=20160815,pHour=12,adv=0) location "/tmp/test/example/pday=20160815/phour=12/adv=0/" ;
+alter table eaux add if not exists partition(pDay=20160815,pHour=12,adv=1) location "/tmp/test/example/pday=20160815/phour=12/adv=1/" ;
+
+1.
+select id_advertiser_id,count(*),sum(imp),sum(click) from eaux where pDay=20160815 and pHour=12 group by id_advertiser_id;
+select advertiser_id,sum(bid),sum(imp),sum(click) from rpt_effect_hour where day = '20160815' and `hour` = 12 group by advertiser_id ;
+
+2.
+select action_platform,count(*),sum(imp),sum(click) from eaux where pDay=20160815 and pHour=12 group by action_platform;
+select platform,sum(bid),sum(imp),sum(click) from rpt_effect_hour where day = '20160815' and `hour` = 12 group by platform  ;
+
+
+
+```groovy
+def map = [:]
+new File("/Users/crnsnl/Downloads/auex-mysql.txt").splitEachLine(","){
+	map[it[0]] = (it[1] as int) + (it[2] as int) + (it[3] as int)
+}
+new File("/Users/crnsnl/Downloads/auex-hive.txt").splitEachLine("\\s+"){
+	def expected = map[it[0]]
+	def actual = it[1] as int
+	def diff = (expected- actual)
+	if(diff>0){
+		println "${it[0]}\t$diff"
+	}
+}
+```
